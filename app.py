@@ -63,8 +63,13 @@ if uploaded_file:
     st.subheader("Original Image")
     st.image(image, use_column_width=True)
 
-    # Perform resize
-    resized_img = image.resize((width, height), Image.ANTIALIAS)
+    # Perform resize using high-quality resampling
+    try:
+        resample_filter = Image.Resampling.LANCZOS
+    except AttributeError:
+        # Pillow<9 fallback
+        resample_filter = Image.ANTIALIAS
+    resized_img = image.resize((width, height), resample_filter)
     st.subheader("Resized Preview")
     st.image(resized_img, use_column_width=True)
 
