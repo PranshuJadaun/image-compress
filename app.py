@@ -29,28 +29,29 @@ output_format = st.sidebar.selectbox(
     "Output Format", options=["JPEG", "PNG"], index=0
 )
 
-# Placeholder for uploaded file buffer to clean up later
+# Globals for cleanup
 buffer = None
 uploaded_file = None
 
-# Function to clear sensitive data from memory
+# Cleanup function to remove sensitive data
 def clear_sensitive():
     global buffer, uploaded_file
-    try:
-        if buffer:
+    # Close buffers/files
+    if buffer:
+        try:
             buffer.close()
-    except Exception:
-        pass
-    try:
-        if uploaded_file:
+        except Exception:
+            pass
+    if uploaded_file:
+        try:
             uploaded_file.close()
-    except Exception:
-        pass
-    # Clear session state to remove any stored variables
+        except Exception:
+            pass
+    # Clear session state
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-    # Rerun to refresh app
-    st.experimental_rerun()
+    # Stop further execution
+    st.stop()
 
 # File uploader
 uploaded_file = st.file_uploader(
@@ -58,32 +59,33 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    # Load image
+    # Open image
     image = Image.open(uploaded_file)
     st.subheader("Original Image")
     st.image(image, use_column_width=True)
 
-    # Perform resize using high-quality resampling
+    # Determine resampling filter
     try:
         resample_filter = Image.Resampling.LANCZOS
     except AttributeError:
-        # Pillow<9 fallback
-        resample_filter = Image.ANTIALIAS
+        resample_filter = Image.LANCZOS if hasattr(Image, 'LANCZOS') else Image.ANTIALIAS
+
+    # Resize image
     resized_img = image.resize((width, height), resample_filter)
     st.subheader("Resized Preview")
     st.image(resized_img, use_column_width=True)
 
-    # Prepare buffer
+    # Prepare in-memory buffer
     buffer = io.BytesIO()
     fmt = output_format.upper()
 
-    # For PNG, ignore quality; for JPEG, handle transparency
     if fmt == "PNG":
         resized_img.save(buffer, format="PNG", optimize=True)
         mime = "image/png"
         ext = "png"
     else:
-        if resized_img.mode in ("RGBA", "LA"):  # convert transparency
+        # Handle transparency for JPEG
+        if resized_img.mode in ("RGBA", "LA"):
             bg = Image.new("RGB", resized_img.size, (255, 255, 255))
             bg.paste(resized_img, mask=resized_img.split()[3])
             save_img = bg
@@ -95,7 +97,7 @@ if uploaded_file:
 
     buffer.seek(0)
 
-    # Download button with cleanup callback
+    # Download button with cleanup
     st.download_button(
         label=f"Download {width}×{height} {fmt}",
         data=buffer,
